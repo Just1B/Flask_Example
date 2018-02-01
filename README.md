@@ -1,6 +1,7 @@
 
 # Flask playground
-    This is a demo version of a flask API with different scenarios.
+
+This is a demo version of a flask API with different scenarios.
 
 ## Install requirements
 
