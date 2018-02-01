@@ -1,13 +1,15 @@
 import time
+import json
 from faker import Faker
 
-from flask import Flask, request
+from flask import Flask, request, jsonify, redirect
 from flask_cors import CORS
-from flask_sqlalchemy import SQLAlchemy
 from flask_bcrypt import Bcrypt
 
-# DATABASE MODELS
-from models.models import Base, Posts
+# DATABASE PART
+from flask_sqlalchemy import SQLAlchemy
+from flask_marshmallow import Marshmallow
+from models.models import Base, Post
 
 app = Flask(__name__)
 
@@ -18,62 +20,135 @@ app.config['DEBUG'] = True
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:root@localhost:8889/flask'
 
+# Order matters: Initialize SQLAlchemy before Marshmallow
 db = SQLAlchemy(app)
+ma = Marshmallow(app)
 
 fake = Faker()
 
 bcrypt = Bcrypt(app)
 
 
+class PostSchema(ma.ModelSchema):
+    class Meta:
+        model = Post
+
+
+post_schema = PostSchema()
+
+
+@app.errorhandler(404)
+def page_not_found(e):
+    return redirect('/')
+
+
 @app.route('/')
 def index():
-    return 'Hello, From Flask!'
+
+    response = {
+        'success': True,
+        'message': 'Hello, From Flask !'
+    }
+
+    return jsonify(response)
 
 
-@app.route('/<name>')
+@app.route('/hello/<name>')
 def name(name):
-    return 'Hello! %s' % name
+
+    response = {
+        'success': True,
+        'message': 'Hello, %s !' % name
+    }
+
+    return jsonify(response)
 
 
 @app.route('/hash/<password>')
 def hash(password):
-    pw_hash = bcrypt.generate_password_hash(password).decode('utf-8')
-    return u"".join([u"Hashing <strong> {0} </strong>  with BCRYPT and got =>  <strong> {1} </strong>".format(password, pw_hash)])
+
+    if password is not None:
+        pw_hash = bcrypt.generate_password_hash(password).decode('utf-8')
+
+        response = {
+            'success': True,
+            'plain_text': password,
+            'bcrypt': pw_hash
+        }
+    else:
+        response = {
+            'success': False,
+            'message': 'Please submit a plain text',
+        }
+
+    return jsonify(response)
 
 
-@app.route("/fakes", methods=['GET'])
-def add_fake():
-    if 'numbers' in request.args:
-        numbers = request.args.get('numbers', 0)
-
+@app.route("/fakes/<numbers>", methods=['GET'])
+def add_fake(numbers):
+    if numbers is not None:
         try:
             for _ in range(int(numbers)):
-                new_post = Posts(title=fake.name(), content=fake.text())
+                new_post = Post(title=fake.name(), content=fake.text())
                 db.session.add(new_post)
                 db.session.commit()
-            return "%s posts added" % numbers
+
+            response = {
+                'success': True,
+                'message': '%s Fakes created' % numbers
+            }
 
         except ValueError:
-            return "Numbers must be and Integer"
+            response = {
+                'success': False,
+                'message': 'Please submit a number',
+            }
 
     else:
-        return "Numbers is not define, please add has url parameter"
+        response = {
+            'success': False,
+            'message': "Numbers is not define, please add has url parameter"
+        }
+
+    return jsonify(response)
 
 
 @app.route("/posts", methods=['GET'])
 def get_posts():
-    posts = db.session.query(Posts).all()
-    return u"<br>".join([u"<h2> {0} </h2 > <p> {1} </p>".format(post.title, post.content) for post in posts])
+
+    posts = db.session.query(Post).all()
+
+    output = []
+    for post in posts:
+        output.append(post_schema.dump(post).data)
+
+    response = {
+        'success': True,
+        'posts': output
+    }
+
+    return jsonify(response)
 
 
 @app.route('/post/<post_id>', methods=['GET'])
 def get_post(post_id):
-    post = db.session.query(Posts).filter_by(id=post_id).first()
+    post = db.session.query(Post).filter_by(id=post_id).first()
 
     if post is not None:
-        return u"<br>".join([u"<h2> {0} </h2 > <p> {1} </p>".format(post.title, post.content)])
+        output = post_schema.dump(post).data
+
+        response = {
+            'success': True,
+            'post': output
+        }
+
     else:
-        return "Post not Found"
+        response = {
+            'success': False,
+            'message': 'Post not found'
+        }
+
+    return jsonify(response)
 
 
 @app.route("/for_test", methods=['GET'])
@@ -96,8 +171,8 @@ def for_test():
 
 @app.route("/getTime", methods=['GET'])
 def get_time():
-    print("server time : ", time.strftime('%A %B, %d %Y %H:%M:%S'))
-    return "Done"
+    server_time = time.strftime('%A %B, %d %Y %H:%M:%S')
+    return server_time
 
 
 if __name__ == "__main__":

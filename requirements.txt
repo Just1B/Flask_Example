@@ -4,3 +4,5 @@ PyMySQL
 Faker
 flask_cors
 flask-bcrypt
+flask_marshmallow
+marshmallow-sqlalchemy
