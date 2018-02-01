@@ -2,3 +2,5 @@ Flask
 SQLAlchemy
 PyMySQL
 Faker
+flask_cors
+flask-bcrypt

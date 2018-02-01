@@ -1,38 +1,33 @@
 import time
 from faker import Faker
-# from pprint import pprint
 
 from flask import Flask, request
+from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
+from flask_bcrypt import Bcrypt
 
-from models import Base, Posts
+# DATABASE MODELS
+from models.models import Base, Posts
 
 app = Flask(__name__)
-app.config['DEBUG'] = True
 
+# CHANGE AFTER API VERSIONING
+CORS(app, resources=r'/*')
+
+app.config['DEBUG'] = True
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:root@localhost:8889/flask'
+
 db = SQLAlchemy(app)
 
 fake = Faker()
 
-
-@app.before_first_request
-def setup():
-    print('BEFORE APP START \n')
-    Base.metadata.drop_all(bind=db.engine)
-    Base.metadata.create_all(bind=db.engine)
-
-    for _ in range(10):
-        new_post = Posts(title=fake.name(), content=fake.text())
-        db.session.add(new_post)
-        db.session.commit()
-
-    print('ADD SOME FAKE CONTENT \n\n')
+bcrypt = Bcrypt(app)
 
 
 @app.route('/')
 def index():
-    return 'Hello, Flask!'
+    return 'Hello, From Flask!'
 
 
 @app.route('/<name>')
@@ -40,14 +35,32 @@ def name(name):
     return 'Hello! %s' % name
 
 
-@app.route("/sleep")
-def req():
-    t = request.values.get('t', 0)
-    time.sleep(float(t))  # just to show it works...
-    return 'Hello, %s!' % t
+@app.route('/hash/<password>')
+def hash(password):
+    pw_hash = bcrypt.generate_password_hash(password).decode('utf-8')
+    return u"".join([u"Hashing <strong> {0} </strong>  with BCRYPT and got =>  <strong> {1} </strong>".format(password, pw_hash)])
 
 
-@app.route("/posts")
+@app.route("/fakes", methods=['GET'])
+def add_fake():
+    if 'numbers' in request.args:
+        numbers = request.args.get('numbers', 0)
+
+        try:
+            for _ in range(int(numbers)):
+                new_post = Posts(title=fake.name(), content=fake.text())
+                db.session.add(new_post)
+                db.session.commit()
+            return "%s posts added" % numbers
+
+        except ValueError:
+            return "Numbers must be and Integer"
+
+    else:
+        return "Numbers is not define, please add has url parameter"
+
+
+@app.route("/posts", methods=['GET'])
 def get_posts():
     posts = db.session.query(Posts).all()
     return u"<br>".join([u"<h2> {0} </h2 > <p> {1} </p>".format(post.title, post.content) for post in posts])
