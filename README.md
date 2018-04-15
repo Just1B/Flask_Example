@@ -11,9 +11,9 @@ Install all dependencies `Flask, SQLAlchemy, PyMySQL, Faker, ...`
     pip3 install -r requirements.txt
 ```
 
-## Mysql database credentials
+## Mysql database and credentials
 
-Edit `app.config['SQLALCHEMY_DATABASE_URI']` with your credentials
+Create your database and Edit `app.config['SQLALCHEMY_DATABASE_URI']` with your credentials
 
 
 ## Start the server with autoreload
